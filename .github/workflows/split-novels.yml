@@ -1,0 +1,88 @@
+name: Split Novel Chapters
+
+on:
+  push:
+    paths:
+      - '*.txt'
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  split-novels:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+        
+    - name: Create necessary directories
+      run: |
+        mkdir -p already
+        
+    - name: Install dependencies
+      run: |
+        python -c "import re, os, argparse; print('Dependencies already available')"
+        
+    - name: Find and process TXT files
+      run: |
+        echo "Looking for TXT files in root directory..."
+        find . -maxdepth 1 -name "*.txt" -type f | grep -v "./already/" > files_to_process.txt
+        
+        if [ ! -s files_to_process.txt ]; then
+          echo "No TXT files found to process"
+          exit 0
+        fi
+        
+        echo "Found files to process:"
+        cat files_to_process.txt
+        
+        while IFS= read -r file; do
+          if [ -z "$file" ]; then
+            continue
+          fi
+          
+          # 获取不带路径和扩展名的文件名
+          filename=$(basename "$file" .txt)
+          filename=$(echo "$filename" | sed 's/^\.\///')
+          
+          echo "Processing: $filename.txt"
+          
+          # 为每本小说创建单独的输出文件夹
+          output_dir="${filename}"
+          mkdir -p "$output_dir"
+          
+          # 直接使用 .github/scripts/fenli.py
+          python .github/scripts/fenli.py "$filename.txt" -o "$output_dir"
+          
+          # 检查是否成功处理
+          if [ $? -eq 0 ] && [ -d "$output_dir" ] && [ "$(ls -A "$output_dir")" ]; then
+            echo "Successfully split $filename.txt"
+            # 移动原文件到already文件夹
+            mv "$filename.txt" "already/"
+            echo "Moved $filename.txt to already/"
+          else
+            echo "Failed to split $filename.txt, keeping original file"
+            # 清理空目录
+            rm -rf "$output_dir"
+          fi
+          
+        done < files_to_process.txt
+        
+        # 删除临时文件
+        echo "Cleaning up temporary files..."
+        rm -f files_to_process.txt
+        
+    - name: Commit and push changes
+      env:
+        GIT_EMAIL: ${{ secrets.GIT_EMAIL }}
+        GIT_NAME: ${{ secrets.GIT_NAME }}
+      run: |
+        git config --local user.email "$GIT_EMAIL"
+        git config --local user.name "$GIT_NAME"
+        git add .
+        git commit -m "Auto-split novel files and organize output" || echo "No changes to commit"
+        git push
