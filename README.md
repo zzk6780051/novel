@@ -34,8 +34,8 @@
 
 1. 进入仓库的 **Settings** → **Secrets and variables** → **Actions**
 2. 点击 **New repository secret** 添加以下两个 secret：
-   - `GIT_EMAIL`：你的邮箱地址（例如：zzk6780051@gmail.com）
-   - `GIT_NAME`：你的用户名（例如：zzk6780051）
+   - `GIT_EMAIL`：你的邮箱地址
+   - `GIT_NAME`：你的用户名
 
 ### 自动处理
 当 `.txt` 文件被推送到仓库根目录时，GitHub Actions 会自动运行并处理这些文件。
