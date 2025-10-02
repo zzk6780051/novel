@@ -72,9 +72,15 @@ jobs:
           
         done < files_to_process.txt
         
-        # 删除临时文件
+    - name: Clean up temporary files
+      run: |
         echo "Cleaning up temporary files..."
+        # 删除临时文件
         rm -f files_to_process.txt
+        # 如果存在files_to_process文件夹也删除
+        if [ -d "files_to_process" ]; then
+          rm -rf "files_to_process"
+        fi
         
     - name: Commit and push changes
       env:

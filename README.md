@@ -86,7 +86,7 @@ python .github/scripts/fenli.py novel.txt -o output_directory
 
 ## 📝 输出示例
 
-对于输入文件 `老马识途柳娇娇.txt`，输出结构如下：
+对于输入文件 `小说.txt`，输出结构如下：
 
 ```
 小说/
