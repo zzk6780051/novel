@@ -4,7 +4,7 @@ on:
   push:
     paths:
       - '*.txt'
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 jobs:
   split-novels:
@@ -22,6 +22,7 @@ jobs:
     - name: Create necessary directories
       run: |
         mkdir -p already
+        mkdir -p novel
         
     - name: Install dependencies
       run: |
@@ -30,7 +31,7 @@ jobs:
     - name: Find and process TXT files
       run: |
         echo "Looking for TXT files in root directory..."
-        find . -maxdepth 1 -name "*.txt" -type f | grep -v "./already/" > files_to_process.txt
+        find . -maxdepth 1 -name "*.txt" -type f | grep -v "./already/" | grep -v "./novel/" > files_to_process.txt
         
         if [ ! -s files_to_process.txt ]; then
           echo "No TXT files found to process"
@@ -45,28 +46,23 @@ jobs:
             continue
           fi
           
-          # 获取不带路径和扩展名的文件名
           filename=$(basename "$file" .txt)
           filename=$(echo "$filename" | sed 's/^\.\///')
           
           echo "Processing: $filename.txt"
           
-          # 为每本小说创建单独的输出文件夹，直接使用原文件名
-          output_dir="${filename}"
+          # 输出到novel目录下的子目录
+          output_dir="novel/${filename}"
           mkdir -p "$output_dir"
           
-          # 直接使用 .github/scripts/fenli.py
           python .github/scripts/fenli.py "$filename.txt" -o "$output_dir"
           
-          # 检查是否成功处理
           if [ $? -eq 0 ] && [ -d "$output_dir" ] && [ "$(ls -A "$output_dir")" ]; then
             echo "Successfully split $filename.txt"
-            # 移动原文件到already文件夹
             mv "$filename.txt" "already/"
             echo "Moved $filename.txt to already/"
           else
             echo "Failed to split $filename.txt, keeping original file"
-            # 清理空目录
             rm -rf "$output_dir"
           fi
           
@@ -74,10 +70,7 @@ jobs:
         
     - name: Clean up temporary files
       run: |
-        echo "Cleaning up temporary files..."
-        # 删除临时文件
         rm -f files_to_process.txt
-        # 如果存在files_to_process文件夹也删除
         if [ -d "files_to_process" ]; then
           rm -rf "files_to_process"
         fi
