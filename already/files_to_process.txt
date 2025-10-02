@@ -1,6 +1,2 @@
-./蛊真人.txt
-./我在精神病院学斩神.txt
-./道诡异仙.txt
-./凡人修仙传.txt
+./人道大圣.txt
 ./files_to_process.txt
-./十日终焉.txt
