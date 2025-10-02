@@ -47,9 +47,4 @@ jobs:
         accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         projectName: novels-site
         directory: ./dist
-        gitHubToken: ${{ secrets.GITHUB_TOKEN }}      with:
-        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        projectName: novels-site
-        directory: ./dist
-        gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+        gitHubToken: ${{ secrets.GITHUB_TOKEN }}     
