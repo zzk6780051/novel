@@ -4,7 +4,7 @@ on:
   push:
     paths:
       - 'novel/**'
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
   workflow_run:
     workflows: ["Split Novel Chapters"]
     types:
@@ -25,7 +25,15 @@ jobs:
         
     - name: Generate HTML site
       run: |
+        echo "开始生成小说站点..."
         python .github/scripts/generate_site.py
+        echo "站点生成完成"
+        
+    - name: List generated files
+      run: |
+        echo "生成的站点结构:"
+        find dist -type f -name "*.html" | head -20
+        echo "..."
         
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -35,6 +43,11 @@ jobs:
     - name: Deploy to Cloudflare Pages
       uses: cloudflare/pages-action@1
       with:
+        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        projectName: novels-site
+        directory: ./dist
+        gitHubToken: ${{ secrets.GITHUB_TOKEN }}      with:
         apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         projectName: novels-site
