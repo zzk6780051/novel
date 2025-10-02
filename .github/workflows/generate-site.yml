@@ -1,0 +1,42 @@
+name: Generate Novel Site
+
+on:
+  push:
+    paths:
+      - 'novel/**'
+  workflow_dispatch:  # 允许手动触发
+  workflow_run:
+    workflows: ["Split Novel Chapters"]
+    types:
+      - completed
+
+jobs:
+  generate-site:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+        
+    - name: Generate HTML site
+      run: |
+        python .github/scripts/generate_site.py
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Deploy to Cloudflare Pages
+      uses: cloudflare/pages-action@1
+      with:
+        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        projectName: novels-site
+        directory: ./dist
+        gitHubToken: ${{ secrets.GITHUB_TOKEN }}
