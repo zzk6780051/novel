@@ -51,7 +51,7 @@ jobs:
           
           echo "Processing: $filename.txt"
           
-          # 为每本小说创建单独的输出文件夹
+          # 为每本小说创建单独的输出文件夹，直接使用原文件名
           output_dir="${filename}"
           mkdir -p "$output_dir"
           
