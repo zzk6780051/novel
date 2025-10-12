@@ -5,11 +5,11 @@ import argparse
 import sys
 import glob
 import logging
-import zipfile
-import shutil
 from typing import List, Tuple, Dict, Any, Optional
 from datetime import datetime
 import hashlib
+import zipfile
+import shutil
 
 class EnhancedNovelSplitter:
     def __init__(self, log_file: Optional[str] = None):
@@ -41,7 +41,7 @@ class EnhancedNovelSplitter:
             'successful_splits': 0,
             'total_chapters': 0,
             'failed_files': 0,
-            'created_zips': 0
+            'zip_files_created': 0
         }
     
     def setup_logging(self, log_file: Optional[str] = None):
@@ -66,40 +66,6 @@ class EnhancedNovelSplitter:
             file_handler.setLevel(logging.INFO)
             file_handler.setFormatter(formatter)
             self.logger.addHandler(file_handler)
-    
-    def create_zip_archive(self, directory_path: str, zip_filename: Optional[str] = None) -> str:
-        """将目录打包成ZIP压缩包"""
-        if not os.path.exists(directory_path):
-            raise FileNotFoundError(f"目录不存在: {directory_path}")
-        
-        if not zip_filename:
-            base_name = os.path.basename(directory_path.rstrip('/\\'))
-            zip_filename = f"{base_name}_章节.zip"
-        
-        # 确保ZIP文件扩展名
-        if not zip_filename.lower().endswith('.zip'):
-            zip_filename += '.zip'
-        
-        zip_path = os.path.join(os.path.dirname(directory_path), zip_filename)
-        
-        self.logger.info(f"创建压缩包: {zip_path}")
-        
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for root, dirs, files in os.walk(directory_path):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    # 在ZIP中创建相对路径
-                    arcname = os.path.relpath(file_path, directory_path)
-                    zipf.write(file_path, arcname)
-        
-        self.logger.info(f"压缩包创建完成: {zip_path}")
-        return zip_path
-    
-    def cleanup_directory(self, directory_path: str):
-        """清理目录"""
-        if os.path.exists(directory_path):
-            shutil.rmtree(directory_path)
-            self.logger.info(f"已清理目录: {directory_path}")
     
     def detect_encoding(self, file_path: str) -> str:
         """检测文件编码"""
@@ -189,7 +155,30 @@ class EnhancedNovelSplitter:
         """计算文件内容的哈希值"""
         return hashlib.md5(content.encode('utf-8')).hexdigest()
     
-    def split_novel(self, input_file: str, output_dir: str = "chapters", create_zip: bool = True) -> Dict[str, Any]:
+    def create_zip_archive(self, source_dir: str, zip_filename: str) -> bool:
+        """创建ZIP压缩包"""
+        try:
+            # 确保zip目录存在
+            zip_dir = "zip"
+            os.makedirs(zip_dir, exist_ok=True)
+            
+            zip_path = os.path.join(zip_dir, zip_filename)
+            
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for root, dirs, files in os.walk(source_dir):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        # 在ZIP文件中创建相对路径
+                        arcname = os.path.relpath(file_path, os.path.dirname(source_dir))
+                        zipf.write(file_path, arcname)
+            
+            self.logger.info(f"已创建ZIP压缩包: {zip_path}")
+            return True
+        except Exception as e:
+            self.logger.error(f"创建ZIP压缩包失败: {e}")
+            return False
+    
+    def split_novel(self, input_file: str, output_dir: str = "chapters") -> Dict[str, Any]:
         """分割小说文件"""
         self.stats['total_files'] += 1
         
@@ -305,31 +294,25 @@ class EnhancedNovelSplitter:
         with open(os.path.join(output_dir, "split_stats.txt"), 'w', encoding='utf-8') as f:
             f.write(stats_content)
         
-        # 创建压缩包
-        zip_path = None
-        if create_zip and success_count > 0:
-            try:
-                zip_path = self.create_zip_archive(output_dir)
-                self.stats['created_zips'] += 1
-                self.logger.info(f"已创建压缩包: {zip_path}")
-                
-                # 清理目录
-                self.cleanup_directory(output_dir)
-                
-            except Exception as e:
-                self.logger.error(f"创建压缩包失败: {e}")
+        # 创建ZIP压缩包
+        zip_filename = f"{output_dir}.zip"
+        zip_success = self.create_zip_archive(output_dir, zip_filename)
         
         result: Dict[str, Any] = {
             "total_chapters": total_chapters,
             "success_count": success_count,
             "success": success_count > 0,
             "metadata": metadata,
-            "zip_path": zip_path
+            "zip_created": zip_success,
+            "zip_filename": zip_filename if zip_success else None
         }
         
         if success_count > 0:
             self.stats['successful_splits'] += 1
             self.stats['total_chapters'] += success_count
+        
+        if zip_success:
+            self.stats['zip_files_created'] += 1
         
         return result
     
@@ -353,7 +336,7 @@ class EnhancedNovelSplitter:
         
         return True
     
-    def batch_process_with_progress(self, file_pattern: str = "*.txt", create_zip: bool = True) -> Dict[str, Any]:
+    def batch_process_with_progress(self, file_pattern: str = "*.txt") -> Dict[str, Any]:
         """批量处理文件并显示进度"""
         txt_files = glob.glob(file_pattern)
         
@@ -369,13 +352,12 @@ class EnhancedNovelSplitter:
             # 修改：直接使用原文件名作为输出目录，不加前缀
             output_dir = f"{filename}"
             
-            result = self.split_novel(file, output_dir, create_zip)
+            result = self.split_novel(file, output_dir)
             
             if result['success']:
                 self.logger.info(f"成功分割 {file}，共 {result['success_count']} 个章节")
-                if result.get('zip_path'):
-                    self.logger.info(f"已创建压缩包: {result['zip_path']}")
-                
+                if result.get('zip_created'):
+                    self.logger.info(f"已创建ZIP文件: {result['zip_filename']}")
                 # 移动原文件到already文件夹
                 os.makedirs("already", exist_ok=True)
                 os.rename(file, os.path.join("already", file))
@@ -388,18 +370,18 @@ class EnhancedNovelSplitter:
         
         return self.stats
 
-def process_all_novels(log_file: Optional[str] = None, create_zip: bool = True):
+def process_all_novels(log_file: Optional[str] = None):
     """处理所有小说文件的函数，用于手动运行"""
     splitter = EnhancedNovelSplitter(log_file)
     
-    stats = splitter.batch_process_with_progress(create_zip=create_zip)
+    stats = splitter.batch_process_with_progress()
     
     print(f"\n=== 批量处理完成 ===")
     print(f"总文件数: {stats['total_files']}")
     print(f"成功分割: {stats['successful_splits']}")
     print(f"失败文件: {stats['failed_files']}")
     print(f"总章节数: {stats['total_chapters']}")
-    print(f"创建压缩包: {stats['created_zips']}")
+    print(f"ZIP文件数: {stats['zip_files_created']}")
     print(f"===================")
 
 def main():
@@ -409,28 +391,27 @@ def main():
     parser.add_argument('-a', '--auto', action='store_true', help='自动处理所有小说文件')
     parser.add_argument('--log', help='日志文件路径')
     parser.add_argument('--pattern', default='*.txt', help='文件匹配模式')
-    parser.add_argument('--no-zip', action='store_true', help='不创建压缩包')
     
     args = parser.parse_args()
     
     splitter = EnhancedNovelSplitter(args.log)
     
     if args.auto:
-        process_all_novels(args.log, create_zip=not args.no_zip)
+        process_all_novels(args.log)
         return
     
     if not args.input_file:
         print("请提供输入文件或使用 -a 参数自动处理所有文件")
         return
     
-    result = splitter.split_novel(args.input_file, args.output, create_zip=not args.no_zip)
+    result = splitter.split_novel(args.input_file, args.output)
     
     if result['success']:
         print(f"处理完成! 共分割 {result['success_count']} 个章节")
         if result.get('metadata'):
             print(f"提取的元数据: {result['metadata']}")
-        if result.get('zip_path'):
-            print(f"已创建压缩包: {result['zip_path']}")
+        if result.get('zip_created'):
+            print(f"已创建ZIP文件: {result['zip_filename']}")
     else:
         print(f"处理失败! 错误: {result.get('error', '未知错误')}")
 
